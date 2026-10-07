@@ -1,0 +1,48 @@
+# .circleci/config.yml - описание пайплайна CircleCI
+version: 2.1
+
+# Переиспользуемая команда: установка зависимостей с кэшем pip
+commands:
+  install-deps:
+    steps:
+      - restore_cache:  # достаём кэш, если requirements.txt не менялся
+          keys:
+            - pip-{{ checksum "requirements.txt" }}
+      - run:
+          name: Install dependencies
+          command: pip install -r requirements.txt
+      - save_cache:  # сохраняем скачанные пакеты для следующих запусков
+          key: pip-{{ checksum "requirements.txt" }}
+          paths:
+            - ~/.cache/pip
+
+jobs:
+  # Задание 1: установка зависимостей и запуск тестов
+  test:
+    docker:
+      - image: cimg/python:3.12  # executor - Docker-контейнер с Python
+    steps:
+      - checkout  # клонируем репозиторий
+      - install-deps
+      - run:
+          name: Run tests
+          command: pytest --junitxml=test-results/junit.xml  # при упавшем тесте job завершится ошибкой
+      - store_test_results:  # результаты тестов видны во вкладке Tests
+          path: test-results
+
+  # Задание 2: проверка форматирования кода
+  lint:
+    docker:
+      - image: cimg/python:3.12
+    steps:
+      - checkout
+      - install-deps
+      - run:
+          name: Check formatting
+          command: black --check .
+
+workflows:
+  build-and-test:
+    jobs:  # у jobs нет requires, поэтому они выполняются параллельно
+      - test
+      - lint
